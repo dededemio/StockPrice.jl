@@ -1,0 +1,6 @@
+{
+    "from": "You",
+    "username": "you@gmail.com",
+    "passwd": "yourpassward",
+    "url": "smtps://smtp.gmail.com:465"
+}
