@@ -10,7 +10,7 @@ include("GetStockPrice.jl")
 @with_kw mutable struct AlertSetting
     stock::String   # 株価ティッカー
     func::String    # アラート関数
-    value::Float64   # アラートのしきい値とする値
+    value::Array{Float64,1}  # アラートのしきい値とする値
     enable::Bool  # アラートの有効化フラグ
     alerted::Bool # アラートがその日に上がったことを示すフラグ
 end
@@ -20,7 +20,7 @@ function initalertsetting()
     settings = Dict(
         "stock" => "SPXL",
         "func" => "checklowerlimit",
-        "value" => 1.0,
+        "value" => "120.0",
         "enable" => true,
         "alerted" => false
     )
@@ -38,7 +38,9 @@ keytosymbol(x) = Dict(Symbol(k) => v for (k, v) in pairs(x))
 function readalertsetting(jsonfile)
     str = open(f -> read(f, String), jsonfile)
     json = JSON.parse(str)
-    setting = AlertSetting(;keytosymbol(json)...)
+    symbol = keytosymbol(json)
+    symbol[:value] = parse.(Float64, split(symbol[:value], ","))
+    setting = AlertSetting(;symbol...)
     return setting
 end
 
@@ -46,9 +48,7 @@ end
 # dir: 設定読み込み先ディレクトリ名
 # key: 読み込む設定に該当するキー
 function readalertsettings(;key=".json", dir="./")
-    filelist = readdir(dir)
-    flag = contains.(filelist, key)
-    settings_json = filelist[flag]
+    settings_json = filter(f -> contains(f, key), readdir(dir))
     settings = readalertsetting.(dir .* settings_json)
     return settings
 end
@@ -59,7 +59,7 @@ end
 # 設定下限値を下回った場合にアラート
 function checklowerlimit(alert::AlertSetting, prices)
     message = ""
-    lowerlimit = alert.value
+    lowerlimit = alert.value[1]
     if ( sum(prices."close" .< lowerlimit) > 0 )
         alert.alerted = true
         meet = prices[prices."close" .< lowerlimit,:] # 条件に当てはまったデータ
@@ -68,6 +68,24 @@ function checklowerlimit(alert::AlertSetting, prices)
         dtfmt = "YYYY/mm/dd HH:MM:SS"
         message = alert.stock * "の株価が下限値設定を下回りました．\r\n" * 
             "下限値: " * string(lowerlimit) * "\r\n" *
+            "時刻: " * Dates.format(dt, dtfmt) * "\r\n" * 
+            "株価: " * price * "\r\n"
+    end
+    return message
+end
+
+# 設定上限値を上回った場合にアラート
+function checkupperlimit(alert::AlertSetting, prices)
+    message = ""
+    upperlimit = alert.value[1]
+    if ( sum(prices."close" .> upperlimit) > 0 )
+        alert.alerted = true
+        meet = prices[prices."close" .> upperlimit, :] # 条件に当てはまったデータ
+        price = string(round(meet[1, "close"], digits=1))
+        dt = meet[1, "timestamp"]
+        dtfmt = "YYYY/mm/dd HH:MM:SS"
+        message = alert.stock * "の株価が上限を超過しました．\r\n" * 
+            "上限値: " * string(upperlimit) * "\r\n" *
             "時刻: " * Dates.format(dt, dtfmt) * "\r\n" * 
             "株価: " * price * "\r\n"
     end

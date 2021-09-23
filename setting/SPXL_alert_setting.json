@@ -2,6 +2,6 @@
     "enable": true,
     "alerted": false,
     "stock": "SPXL",
-    "value": 116.7,
+    "value": "116.7",
     "func": "checklowerlimit"
 }
