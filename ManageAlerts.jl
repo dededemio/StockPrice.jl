@@ -1,5 +1,5 @@
 # Juliaを使った株価のアラート通知
-using JSON, Parameters, TimeZones, Logging
+using JSON, Parameters, TimeZones, Logging, CSV, DataFrames, BusinessDays, Dates
 # cd(raw"C:\workspace\StockPrice.jl") # for debug
 include("SendGmail.jl")
 include("GetStockPrice.jl")
@@ -98,17 +98,21 @@ end
 # 指定されたalertsリストのアラートをチェックして，条件を満たせばアラートメールを発信する
 # alerts Array{AlertSetting, 1}
 function exealert(alerts)
-    # 開場時間取得
-    now_tk = now() # 日本時間
-    now_ny = now(tz"America/New_York") # 米国東部時間
-    open_ny = (Time(now_ny) > Time(9, 30)) && (Time(now_ny) < Time(16, 0)) # NY証券取引所
-    open_tk = (Time(now_tk) > Time(9, 00)) && (Time(now_tk) < Time(15, 0)) # 東京証券取引所
 
-    # 開場時にまだアラートが発されていなければ，アラートチェックする
     for alert in alerts
-        market_open = ( open_ny && !contains(alert.stock, ".T") ) || 
-               ( open_tk &&  contains(alert.stock, ".T") ) # 開場判定
-        if !alert.alerted && market_open && alert.enable
+        # 開場時間判定
+        if( contains(alert.stock, ".T") )
+            now_tk = now() # 日本時間
+            open_tk = (Time(now_tk) > Time(9, 00)) && (Time(now_tk) < Time(15, 0)) # 東京証券取引所
+            market_open = open_tk && isbday("JPTSE", Date(now_tk))
+        else
+            now_ny = now(tz"America/New_York") # 米国東部時間
+            open_ny = (Time(now_ny) > Time(9, 30)) && (Time(now_ny) < Time(16, 0)) # NY証券取引所
+            market_open =  open_ny && isbday("USNYSE", Date(now_ny))             
+        end
+        
+        # 開場時にアラート有効かつアラート未発報
+        if market_open && alert.enable && !alert.alerted
             info("株価を確認します: " * alert.stock)
             prices = getstockprice(alert.stock)
             message = eval(:( $(Symbol(alert.func))($alert, $prices) )) # 文字列で与えた関数の評価
@@ -121,6 +125,18 @@ function exealert(alerts)
         end
     end
 
+end
+
+# 東京証券取引所の祝日を追加定義
+struct JPTSE <: BusinessDays.HolidayCalendar end
+function BusinessDays.isholiday(::JPTSE, dt::Dates.Date)
+    # [東証の祝日](https://www.jpx.co.jp/corporate/about-jpx/calendar/index.html)
+    # 上記は取得しにくいので内閣府からCSVをダウンロード．ただし 1/2, 1/3, 12/31が不足しているので追記必須．年1回程度確認する
+    # download("https://www8.cao.go.jp/chosei/shukujitsu/syukujitsu.csv", filename)
+    filename = "./data/holidays_JPTSE.csv"
+    dfmt = dateformat"yyyy/mm/dd"
+    df = DataFrame(CSV.File(filename, dateformat=dfmt))
+    return sum(df[:,1] .== Date(dt)) > 0
 end
 
 
