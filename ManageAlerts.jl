@@ -103,11 +103,11 @@ function exealert(alerts)
         # 開場時間判定
         if( contains(alert.stock, ".T") )
             now_tk = now() # 日本時間
-            open_tk = (Time(now_tk) > Time(9, 00)) && (Time(now_tk) < Time(15, 0)) # 東京証券取引所
+            open_tk = (Time(now_tk) >= Time(9, 00)) && (Time(now_tk) <= Time(15, 0)) # 東京証券取引所
             market_open = open_tk && isbday("JPTSE", Date(now_tk))
         else
             now_ny = now(tz"America/New_York") # 米国東部時間
-            open_ny = (Time(now_ny) > Time(9, 30)) && (Time(now_ny) < Time(16, 0)) # NY証券取引所
+            open_ny = (Time(now_ny) >= Time(9, 30)) && (Time(now_ny) <= Time(16, 0)) # NY証券取引所
             market_open =  open_ny && isbday("USNYSE", Date(now_ny))             
         end
         
@@ -115,12 +115,13 @@ function exealert(alerts)
         if market_open && alert.enable && !alert.alerted
             info("株価を確認します: " * alert.stock)
             prices = getstockprice(alert.stock)
+            info("price: " * string(prices[end,:].close))
             message = eval(:( $(Symbol(alert.func))($alert, $prices) )) # 文字列で与えた関数の評価
             if alert.alerted
                 title = "【株価アラート通知】" * alert.stock
                 info("アラートメールを発信します．\n" * message)
-                sendmail(title, message) # アラートメールの発信
-                info("アラートメールを発信しました．")
+                resp = sendmail(title, message) # アラートメールの発信
+                info("アラートメールを発信しました．\n"*string(resp))
             end
         end
     end

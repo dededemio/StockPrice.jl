@@ -26,16 +26,16 @@ function savedailystockprice(stock)
     interval = "1m" # 取得データの間隔
     today = getstockprice(stock, range, interval)
     dtfmt = "yyyy/mm/dd HH:MM:SS"
-    
+
     # CSV読み込み
-    past = DataFrame(CSV.File("./data/" * stock * ".csv", header=true))
+    past = DataFrame(CSV.File("./data/" * stock * ".csv", header = true))
     past."timestamp" = DateTime.(past."timestamp", dtfmt)
 
     # データを結合
     all = vcat(past, today)
-    
+
     # 重複データを削除
-    all = all[uniqueindex(all.timestamp),:]
+    all = all[uniqueindex(all.timestamp), :]
 
     # 日付順でソート
     all = sort(all)
@@ -50,7 +50,7 @@ end
 
 function main()
     # 取得対象の銘柄の指定．東証の株価は".T"をつける．
-    stocks = ["1557.T" "SPY" "SPXL" "SPXS"]  
+    stocks = ["1557.T" "SPY" "SPXL" "SPXS" "TECL" "CURE" "SOXL" "DRN" "TNA" "EDC"]
     try
         savedailystockprice.(stocks)
     catch err

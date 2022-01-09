@@ -42,4 +42,5 @@ function sendmail(subject::String, message::String)
     rcpt = ["<" * setting["username"] * ">"]
     from = "<" * setting["username"] * ">"
     resp = send(url, rcpt, from, body, opt)
+    return resp
 end
